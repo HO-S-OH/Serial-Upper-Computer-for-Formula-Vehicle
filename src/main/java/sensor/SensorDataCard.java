@@ -17,7 +17,7 @@ public class SensorDataCard extends JPanel {
     
     private String sensorName;       // 传感器名称
     private String unit;             // 单位
-    private Color themeColor;        // 主题颜色
+    protected Color themeColor;      // 主题颜色（改为protected，让子类可以访问）
     private List<Double> recentValues; // 最近的数据值列表
     
     /**
@@ -106,5 +106,13 @@ public class SensorDataCard extends JPanel {
         double avg = recentValues.stream().mapToDouble(Double::doubleValue).average().orElse(0);
         
         historyLabel.setText(String.format("最小:%.1f | 最大:%.1f | 平均:%.1f", min, max, avg));
+    }
+    
+    /**
+     * 获取主题颜色
+     * @return 主题颜色
+     */
+    public Color getThemeColor() {
+        return themeColor;
     }
 }

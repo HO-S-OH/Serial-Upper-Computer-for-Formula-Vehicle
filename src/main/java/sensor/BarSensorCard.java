@@ -35,19 +35,12 @@ public class BarSensorCard extends SensorDataCard {
         progressBar = new JProgressBar((int)minValue, (int)maxValue);
         progressBar.setStringPainted(true);
         progressBar.setFont(new Font("微软雅黑", Font.BOLD, 12));
-        progressBar.setForeground(getThemeColor());
+        progressBar.setForeground(themeColor);
         progressBar.setBackground(new Color(240, 240, 240));
         progressBar.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
         progressBar.setPreferredSize(new Dimension(250, 25));
         
         add(progressBar, BorderLayout.SOUTH);
-    }
-    
-    /**
-     * 获取主题颜色（从父类获取）
-     */
-    private Color getThemeColor() {
-        return getBackground().darker();
     }
     
     @Override
