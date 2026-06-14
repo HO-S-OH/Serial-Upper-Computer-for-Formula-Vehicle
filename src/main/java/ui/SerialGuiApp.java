@@ -5,12 +5,14 @@ import com.fazecast.jSerialComm.SerialPortEvent;
 import sensor.BarSensorCard;
 import sensor.SensorDataCard;
 import sensor.SensorType;
+import serial.ExcelExporter;
 import serial.SerialConfig;
 import serial.SerialHelper;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import java.awt.*;
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -26,6 +28,12 @@ import java.util.Map;
 public class SerialGuiApp extends JFrame {
     // 串口业务逻辑助手对象
     private SerialHelper serialHelper;
+    
+    // Excel导出器
+    private ExcelExporter excelExporter;
+    
+    // 是否启用实时保存
+    private boolean isRealTimeSaveEnabled = false;
 
     // ========== 界面组件声明 ==========
 
@@ -43,6 +51,12 @@ public class SerialGuiApp extends JFrame {
 
     // 清空接收区按钮
     private JButton clearReceiveButton;
+    
+    // 导出Excel按钮
+    private JButton exportExcelButton;
+    
+    // 实时保存复选框
+    private JCheckBox realTimeSaveCheckBox;
 
     // 传感器数据卡片容器
     private JPanel sensorCardsPanel;
@@ -58,6 +72,9 @@ public class SerialGuiApp extends JFrame {
 
     // 连接状态标识
     private boolean isConnected = false;
+    
+    // 会话开始时间
+    private Date sessionStartTime;
 
     /**
      * 构造函数
@@ -65,6 +82,7 @@ public class SerialGuiApp extends JFrame {
      */
     public SerialGuiApp() {
         serialHelper = new SerialHelper();
+        excelExporter = new ExcelExporter();
         sensorCardsMap = new HashMap<>();
         initUI();
     }
@@ -79,6 +97,37 @@ public class SerialGuiApp extends JFrame {
         setSize(1400, 900);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        
+        // 添加窗口关闭监听器
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                if (isConnected) {
+                    serialHelper.closePort();
+                }
+                
+                if (excelExporter.getRowCount() > 1) {
+                    int choice = JOptionPane.showConfirmDialog(
+                        SerialGuiApp.this,
+                        "检测到有未保存的数据，是否导出到Excel？\n" +
+                        "（共 " + (excelExporter.getRowCount() - 1) + " 条记录）",
+                        "确认导出",
+                        JOptionPane.YES_NO_CANCEL_OPTION,
+                        JOptionPane.QUESTION_MESSAGE
+                    );
+                    
+                    if (choice == JOptionPane.YES_OPTION) {
+                        exportToExcelManual();
+                    } else if (choice == JOptionPane.CANCEL_OPTION) {
+                        return;
+                    }
+                }
+                
+                excelExporter.close();
+                
+                System.exit(0);
+            }
+        });
 
         // 创建主面板，使用BorderLayout布局
         JPanel mainPanel = new JPanel(new BorderLayout(0, 0));
@@ -109,7 +158,7 @@ public class SerialGuiApp extends JFrame {
         toolbar.setBackground(new Color(30, 33, 40));
         toolbar.setBorder(BorderFactory.createEmptyBorder(15, 25, 15, 25));
 
-        // 左侧：连接控制
+        // 左侧：连接控制 + 数据操作
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         leftPanel.setOpaque(false);
 
@@ -123,6 +172,40 @@ public class SerialGuiApp extends JFrame {
         connectButton.setPreferredSize(new Dimension(160, 48));
         connectButton.addActionListener(e -> showConnectDialog());
         leftPanel.add(connectButton);
+        
+        // 分隔线
+        JSeparator separator = new JSeparator(SwingConstants.VERTICAL);
+        separator.setPreferredSize(new Dimension(2, 40));
+        separator.setForeground(new Color(80, 80, 80));
+        leftPanel.add(separator);
+        
+        // 实时保存复选框
+        realTimeSaveCheckBox = new JCheckBox("实时保存到Excel");
+        realTimeSaveCheckBox.setFont(new Font("微软雅黑", Font.PLAIN, 14));
+        realTimeSaveCheckBox.setForeground(Color.WHITE);
+        realTimeSaveCheckBox.setOpaque(false);
+        realTimeSaveCheckBox.addActionListener(e -> {
+            isRealTimeSaveEnabled = realTimeSaveCheckBox.isSelected();
+            if (isRealTimeSaveEnabled) {
+                System.out.println("✓ 实时保存已启用（数据将自动记录到Excel）");
+            } else {
+                System.out.println("○ 实时保存已禁用（数据仍会记录，可手动导出）");
+            }
+        });
+        leftPanel.add(realTimeSaveCheckBox);
+        
+        // 导出Excel按钮
+        exportExcelButton = new JButton(" 导出当前数据到Excel");
+        exportExcelButton.setFont(new Font("微软雅黑", Font.BOLD, 14));
+        exportExcelButton.setBackground(new Color(40, 167, 69));
+        exportExcelButton.setForeground(Color.BLACK);
+        exportExcelButton.setFocusPainted(false);
+        exportExcelButton.setBorder(BorderFactory.createLineBorder(new Color(30, 130, 55), 2));
+        exportExcelButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        exportExcelButton.setPreferredSize(new Dimension(200, 40));
+        exportExcelButton.setEnabled(false);
+        exportExcelButton.addActionListener(e -> exportToExcel());
+        leftPanel.add(exportExcelButton);
 
         toolbar.add(leftPanel, BorderLayout.WEST);
 
@@ -146,8 +229,7 @@ public class SerialGuiApp extends JFrame {
      * @return 分割面板对象
      */
     private JSplitPane createContentPanel() {
-        // ========== 上方：传感器卡片区域 ==========
-        sensorCardsPanel = new JPanel(new GridLayout(2, 3, 15, 15));
+        sensorCardsPanel = new JPanel(new GridLayout(4, 4, 15, 15));
         sensorCardsPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         sensorCardsPanel.setBackground(new Color(240, 242, 245));
 
@@ -204,7 +286,7 @@ public class SerialGuiApp extends JFrame {
         controlPanel.add(clearReceiveButton);
 
         rawDataPanel.add(controlPanel, BorderLayout.SOUTH);
-
+        
         // ========== 创建垂直分割面板 ==========
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, cardsWrapper, rawDataPanel);
         splitPane.setDividerLocation(600);
@@ -212,12 +294,11 @@ public class SerialGuiApp extends JFrame {
 
         return splitPane;
     }
-
+    
     /**
      * 添加传感器卡片
      */
     private void addSensorCards() {
-        // 定义传感器颜色映射
         Map<SensorType, Color> colorMap = new HashMap<>();
         colorMap.put(SensorType.TS_VOLTAGE, new Color(220, 53, 69));
         colorMap.put(SensorType.TS_CURRENT, new Color(13, 110, 253));
@@ -226,28 +307,38 @@ public class SerialGuiApp extends JFrame {
         colorMap.put(SensorType.SPEED, new Color(111, 66, 193));
         colorMap.put(SensorType.WATER_TEMP, new Color(23, 162, 184));
         
-        // 遍历所有传感器类型，自动创建卡片
+        colorMap.put(SensorType.TIRE_TEMP_FL, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_FR, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RL, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RR, new Color(255, 87, 34));
+        
+        colorMap.put(SensorType.MIN_CELL_VOLT, new Color(156, 39, 176));
+        colorMap.put(SensorType.CELL_TEMP, new Color(233, 30, 99));
+        
+        colorMap.put(SensorType.MOTOR_TEMP, new Color(0, 150, 136));
+        colorMap.put(SensorType.MOTOR_CTRL_TEMP, new Color(0, 188, 212));
+        
+        colorMap.put(SensorType.FRONT_WHEEL_SPEED, new Color(63, 81, 181));
+        colorMap.put(SensorType.POWER_CONSUMPTION, new Color(76, 175, 80));
+        
         for (SensorType type : SensorType.values()) {
             Color color = colorMap.get(type);
             
             if (color == null) {
-                // 如果没有定义颜色，使用默认灰色
                 color = Color.GRAY;
                 System.out.println("警告: 传感器 " + type.getDisplayName() + " 未定义颜色，使用默认灰色");
             }
             
             if ("进度条".equals(type.getDisplayType())) {
-                // 创建带进度条的卡片
                 BarSensorCard card = new BarSensorCard(
                     type.getDisplayName(), 
                     type.getUnit(), 
                     color,
-                    0, 100  // 默认范围0-100，可以根据需要调整
+                    0, 100
                 );
                 sensorCardsPanel.add(card);
                 sensorCardsMap.put(type.getKey(), card);
             } else {
-                // 创建普通卡片
                 SensorDataCard card = new SensorDataCard(
                     type.getDisplayName(), 
                     type.getUnit(), 
@@ -259,6 +350,133 @@ public class SerialGuiApp extends JFrame {
         }
         
         System.out.println("已创建 " + sensorCardsMap.size() + " 个传感器卡片");
+    }
+
+    /**
+     * 初始化Excel导出
+     * 创建工作表并设置表头
+     */
+    private void initializeExcelExport() {
+        if (excelExporter.getRowCount() == 0) {
+            String[] headers = {
+                "时间戳", "毫秒时间", 
+                "TS电压(V)", "TS电流(A)", 
+                "刹车压力(bar)", "油门位置(%)", 
+                "车速(km/h)", "水温(°C)",
+                "左前胎温(°C)", "右前胎温(°C)", "左后胎温(°C)", "右后胎温(°C)",
+                "最低电芯电压(V)", "电芯温度(°C)",
+                "电机温度(°C)", "电机控制器温度(°C)",
+                "前轮轮速(rpm)", "用电量(Wh)"
+            };
+            
+            excelExporter.createSheet("传感器数据", headers);
+            sessionStartTime = new Date();
+            
+            System.out.println("✓ Excel导出已初始化，文件: " + excelExporter.getOutputFileName());
+        }
+    }
+    
+    /**
+     * 手动导出Excel（窗口关闭时使用，不重置）
+     */
+    private void exportToExcelManual() {
+        if (excelExporter.getRowCount() == 0) {
+            return;
+        }
+        
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("选择保存位置");
+        fileChooser.setSelectedFile(new java.io.File(excelExporter.getOutputFileName()));
+        
+        int userSelection = fileChooser.showSaveDialog(this);
+        
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            String fileName = fileChooser.getSelectedFile().getAbsolutePath();
+            if (!fileName.endsWith(".xlsx")) {
+                fileName += ".xlsx";
+            }
+            
+            if (excelExporter.saveToFile(fileName)) {
+                JOptionPane.showMessageDialog(this,
+                    "数据已成功导出到:\n" + fileName,
+                    "导出成功",
+                    JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this,
+                    "导出失败，请检查文件路径和权限",
+                    "导出错误",
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * 导出数据到Excel文件
+     */
+    private void exportToExcel() {
+        // 检查是否有数据（表头算1行，所以至少要有2行才有数据）
+        if (excelExporter.getRowCount() <= 1) {
+            JOptionPane.showMessageDialog(this,
+                "暂无传感器数据可导出，请先接收传感器数据",
+                "无数据",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("选择保存位置");
+        fileChooser.setSelectedFile(new java.io.File(excelExporter.getOutputFileName()));
+        
+        int userSelection = fileChooser.showSaveDialog(this);
+        
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            String fileName = fileChooser.getSelectedFile().getAbsolutePath();
+            if (!fileName.endsWith(".xlsx")) {
+                fileName += ".xlsx";
+            }
+            
+            excelExporter.setOutputFileName(fileName);
+            
+            if (excelExporter.saveToFile(fileName)) {
+                JOptionPane.showMessageDialog(this,
+                    "数据已成功导出到:\n" + fileName + "\n" +
+                    "共导出 " + (excelExporter.getRowCount() - 1) + " 条记录",
+                    "导出成功",
+                    JOptionPane.INFORMATION_MESSAGE);
+                
+                // 重置导出器，准备新的会话
+                excelExporter.reset();
+                initializeExcelExport();
+            } else {
+                JOptionPane.showMessageDialog(this,
+                    "导出失败，请检查文件路径和权限",
+                    "导出错误",
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * 保存单条传感器数据到Excel
+     * @param timestamp 时间戳字符串
+     * @param millis 毫秒时间
+     * @param values 传感器数值数组
+     */
+    private void saveSensorDataToExcel(String timestamp, long millis, double[] values) {
+        // 只要Excel已初始化且有数据，就保存（不再检查实时保存开关）
+        if (excelExporter.getRowCount() == 0) {
+            return;
+        }
+        
+        Object[] rowData = new Object[18];
+        rowData[0] = timestamp;
+        rowData[1] = millis;
+        
+        for (int i = 0; i < Math.min(values.length, 16); i++) {
+            rowData[i + 2] = values[i];
+        }
+        
+        excelExporter.addDataRow(rowData);
     }
 
     /**
@@ -274,7 +492,6 @@ public class SerialGuiApp extends JFrame {
         dialog.setVisible(true);
 
         if (dialog.isConfirmed()) {
-            // 连接成功
             isConnected = true;
             connectButton.setText(" 断开连接");
             connectButton.setBackground(new Color(220, 53, 69));
@@ -284,8 +501,19 @@ public class SerialGuiApp extends JFrame {
                               " [波特率:" + config.getBaudRate() + "]");
             statusLabel.setForeground(new Color(25, 135, 84));
 
-            // 设置数据监听器
             setupDataListener();
+            
+            exportExcelButton.setEnabled(true);
+            
+            // 重置并重新初始化Excel导出器
+            excelExporter.reset();
+            initializeExcelExport();
+            
+            isRealTimeSaveEnabled = false;
+            realTimeSaveCheckBox.setSelected(false);
+            
+            System.out.println("✓ 新会话已开始，Excel导出器已初始化");
+            System.out.println("💡 提示：所有传感器数据将自动记录，点击'导出当前数据到Excel'即可导出");
         }
     }
 
@@ -305,10 +533,6 @@ public class SerialGuiApp extends JFrame {
                 byte[] buffer = new byte[serialHelper.getBytesAvailable()];
                 serialHelper.readBytes(buffer, buffer.length);
                 String data = new String(buffer);
-
-                // 调试输出：显示原始接收到的数据
-                System.out.println("接收到原始数据: [" + data + "]");
-                System.out.println("数据长度: " + data.length());
 
                 SwingUtilities.invokeLater(() -> {
                     // 解析并更新传感器数据
@@ -336,80 +560,75 @@ public class SerialGuiApp extends JFrame {
      */
     private void parseAndUpdateSensorData(String data) {
         try {
-            // 清理数据：移除所有换行符、回车符、多余逗号
             String cleanedData = data.replaceAll("[\\r\\n]+", "").trim();
-            // 移除末尾的逗号
             if (cleanedData.endsWith(",")) {
                 cleanedData = cleanedData.substring(0, cleanedData.length() - 1);
             }
 
             if (cleanedData.isEmpty()) return;
 
-            System.out.println("清理后的数据: " + cleanedData);
-
-            // 按逗号分割
             String[] pairs = cleanedData.split(",");
-            System.out.println("分割成 " + pairs.length + " 个键值对");
+            
+            // 用于存储解析出的传感器数据
+            Map<String, Double> sensorValues = new HashMap<>();
 
-            for (int i = 0; i < pairs.length; i++) {
-                String pair = pairs[i].trim();
-                System.out.println("处理第 " + (i+1) + " 个: [" + pair + "]");
+            for (String pair : pairs) {
+                pair = pair.trim();
+                if (pair.isEmpty()) continue;
 
-                if (pair.isEmpty()) {
-                    System.out.println("  跳过空项");
-                    continue;
-                }
-
-                // 按冒号分割
                 String[] keyValue = pair.split(":");
-                System.out.println("  分割结果: " + keyValue.length + " 部分");
 
                 if (keyValue.length == 2) {
                     String sensorKey = keyValue[0].trim();
                     String valueStr = keyValue[1].trim();
-
-                    System.out.println("  传感器类型: [" + sensorKey + "]");
-                    System.out.println("  原始数值: [" + valueStr + "]");
-
-                    // 清理数值字符串：只保留数字、小数点、负号
                     valueStr = valueStr.replaceAll("[^0-9.\\-]", "");
-                    System.out.println("  清理后数值: [" + valueStr + "]");
 
                     if (!valueStr.isEmpty()) {
                         try {
                             double value = Double.parseDouble(valueStr);
-                            System.out.println("  解析数值: " + value);
-
-                            // ========== 使用枚举验证传感器类型 ==========
+                            
                             SensorType type = SensorType.fromKey(sensorKey);
                             
                             if (type != null) {
-                                // 找到了对应的传感器类型
-                                System.out.println("  ✓ 识别传感器: " + type.getDisplayName());
-                                
-                                // 更新对应的传感器卡片
                                 if (sensorCardsMap.containsKey(sensorKey)) {
                                     sensorCardsMap.get(sensorKey).updateValue(value);
-                                    System.out.println("  ✓ 更新成功: " + type.getDisplayName());
-                                } else {
-                                    System.out.println("  ✗ 卡片不存在: " + sensorKey);
+                                    sensorValues.put(sensorKey, value);
                                 }
-                            } else {
-                                // 未知的传感器类型
-                                System.out.println("  ✗ 未知传感器: " + sensorKey);
-                                System.out.println("  可用传感器: " + sensorCardsMap.keySet());
                             }
                             
                         } catch (NumberFormatException e) {
-                            System.out.println("   数值格式错误: " + valueStr + ", 错误: " + e.getMessage());
+                            System.out.println("数值格式错误: " + valueStr);
                         }
-                    } else {
-                        System.out.println("  ✗ 数值为空");
                     }
-                } else {
-                    System.out.println("  ✗ 键值对格式错误，应该是 key:value");
                 }
             }
+            
+            // 如果有传感器数据，自动保存到Excel（无论是否勾选实时保存）
+            if (!sensorValues.isEmpty() && excelExporter.getRowCount() > 0) {
+                String timeStamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
+                long millis = System.currentTimeMillis();
+                
+                double[] values = new double[16];
+                values[0] = sensorValues.getOrDefault("ts_voltage", 0.0);
+                values[1] = sensorValues.getOrDefault("ts_current", 0.0);
+                values[2] = sensorValues.getOrDefault("brake_pressure", 0.0);
+                values[3] = sensorValues.getOrDefault("throttle", 0.0);
+                values[4] = sensorValues.getOrDefault("speed", 0.0);
+                values[5] = sensorValues.getOrDefault("water_temp", 0.0);
+                values[6] = sensorValues.getOrDefault("tire_temp_fl", 0.0);
+                values[7] = sensorValues.getOrDefault("tire_temp_fr", 0.0);
+                values[8] = sensorValues.getOrDefault("tire_temp_rl", 0.0);
+                values[9] = sensorValues.getOrDefault("tire_temp_rr", 0.0);
+                values[10] = sensorValues.getOrDefault("min_cell_volt", 0.0);
+                values[11] = sensorValues.getOrDefault("cell_temp", 0.0);
+                values[12] = sensorValues.getOrDefault("motor_temp", 0.0);
+                values[13] = sensorValues.getOrDefault("motor_ctrl_temp", 0.0);
+                values[14] = sensorValues.getOrDefault("front_wheel_speed", 0.0);
+                values[15] = sensorValues.getOrDefault("power_consumption", 0.0);
+                
+                saveSensorDataToExcel(timeStamp, millis, values);
+            }
+            
         } catch (Exception e) {
             System.err.println("数据解析错误: " + e.getMessage());
             e.printStackTrace();
@@ -428,6 +647,27 @@ public class SerialGuiApp extends JFrame {
         
         statusLabel.setText("未连接 - 点击\"连接串口\"开始");
         statusLabel.setForeground(Color.BLACK);
+        
+        exportExcelButton.setEnabled(false);
+        
+        if (excelExporter.getRowCount() > 1) {
+            int choice = JOptionPane.showConfirmDialog(
+                this,
+                "检测到有测试数据，是否导出到Excel？\n" +
+                "（共 " + (excelExporter.getRowCount() - 1) + " 条记录）",
+                "确认导出",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+            
+            if (choice == JOptionPane.YES_OPTION) {
+                exportToExcelManual();
+            }
+        }
+        
+        isRealTimeSaveEnabled = false;
+        realTimeSaveCheckBox.setSelected(false);
+        excelExporter.reset();
     }
 
 }
