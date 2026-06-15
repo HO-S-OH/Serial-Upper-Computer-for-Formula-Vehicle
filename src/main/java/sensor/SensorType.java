@@ -24,7 +24,12 @@ public enum SensorType {
     MOTOR_CTRL_TEMP("motor_ctrl_temp", "电机控制器温度", "°C", "普通"),
     
     FRONT_WHEEL_SPEED("front_wheel_speed", "前轮轮速", "rpm", "普通"),
-    POWER_CONSUMPTION("power_consumption", "用电量", "Wh", "普通");
+    POWER_CONSUMPTION("power_consumption", "用电量", "Wh", "普通"),
+    
+    STEERING_ANGLE("steering_angle", "方向盘角度", "°", "双向进度条"),
+    SUSPENSION_FL("suspension_fl", "左前悬架位移", "mm", "双向进度条"),
+    SUSPENSION_FR("suspension_fr", "右前悬架位移", "mm", "双向进度条"),
+    COOLANT_TEMP("coolant_temp", "水箱温度", "°C", "普通");
 
     private String key;
     private String displayName;

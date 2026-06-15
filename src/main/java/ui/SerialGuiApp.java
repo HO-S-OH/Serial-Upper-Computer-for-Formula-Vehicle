@@ -3,6 +3,7 @@ package ui;
 import com.fazecast.jSerialComm.SerialPortDataListener;
 import com.fazecast.jSerialComm.SerialPortEvent;
 import sensor.BarSensorCard;
+import sensor.BidirectionalBarSensorCard;
 import sensor.SensorDataCard;
 import sensor.SensorType;
 import serial.ExcelExporter;
@@ -72,9 +73,6 @@ public class SerialGuiApp extends JFrame {
 
     // 连接状态标识
     private boolean isConnected = false;
-    
-    // 会话开始时间
-    private Date sessionStartTime;
 
     /**
      * 构造函数
@@ -98,7 +96,7 @@ public class SerialGuiApp extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         
-        // 添加窗口关闭监听器
+        // 添加窗口关闭监听器，匿名内部类
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -229,7 +227,7 @@ public class SerialGuiApp extends JFrame {
      * @return 分割面板对象
      */
     private JSplitPane createContentPanel() {
-        sensorCardsPanel = new JPanel(new GridLayout(4, 4, 15, 15));
+        sensorCardsPanel = new JPanel(new GridLayout(0, 4, 15, 15));
         sensorCardsPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         sensorCardsPanel.setBackground(new Color(240, 242, 245));
 
@@ -241,7 +239,6 @@ public class SerialGuiApp extends JFrame {
         cardsWrapper.setBackground(new Color(240, 242, 245));
         cardsWrapper.add(cardsScrollPane, BorderLayout.CENTER);
 
-        // 添加传感器卡片
         addSensorCards();
 
         // ========== 下方：原始数据区域 ==========
@@ -321,6 +318,11 @@ public class SerialGuiApp extends JFrame {
         colorMap.put(SensorType.FRONT_WHEEL_SPEED, new Color(63, 81, 181));
         colorMap.put(SensorType.POWER_CONSUMPTION, new Color(76, 175, 80));
         
+        colorMap.put(SensorType.STEERING_ANGLE, new Color(255, 140, 0));
+        colorMap.put(SensorType.SUSPENSION_FL, new Color(186, 85, 211));
+        colorMap.put(SensorType.SUSPENSION_FR, new Color(186, 85, 211));
+        colorMap.put(SensorType.COOLANT_TEMP, new Color(0, 191, 255));
+        
         for (SensorType type : SensorType.values()) {
             Color color = colorMap.get(type);
             
@@ -335,6 +337,25 @@ public class SerialGuiApp extends JFrame {
                     type.getUnit(), 
                     color,
                     0, 100
+                );
+                sensorCardsPanel.add(card);
+                sensorCardsMap.put(type.getKey(), card);
+            } else if ("双向进度条".equals(type.getDisplayType())) {
+                double min = 0, max = 100;
+                
+                if (type == SensorType.STEERING_ANGLE) {
+                    min = -90;
+                    max = 90;
+                } else if (type == SensorType.SUSPENSION_FL || type == SensorType.SUSPENSION_FR) {
+                    min = -50;
+                    max = 50;
+                }
+                
+                BidirectionalBarSensorCard card = new BidirectionalBarSensorCard(
+                    type.getDisplayName(), 
+                    type.getUnit(), 
+                    color,
+                    min, max
                 );
                 sensorCardsPanel.add(card);
                 sensorCardsMap.put(type.getKey(), card);
@@ -366,11 +387,11 @@ public class SerialGuiApp extends JFrame {
                 "左前胎温(°C)", "右前胎温(°C)", "左后胎温(°C)", "右后胎温(°C)",
                 "最低电芯电压(V)", "电芯温度(°C)",
                 "电机温度(°C)", "电机控制器温度(°C)",
-                "前轮轮速(rpm)", "用电量(Wh)"
+                "前轮轮速(rpm)", "用电量(Wh)",
+                "方向盘角度(°)", "左前悬架(mm)", "右前悬架(mm)", "水箱温度(°C)"
             };
             
             excelExporter.createSheet("传感器数据", headers);
-            sessionStartTime = new Date();
             
             System.out.println("✓ Excel导出已初始化，文件: " + excelExporter.getOutputFileName());
         }
@@ -463,16 +484,15 @@ public class SerialGuiApp extends JFrame {
      * @param values 传感器数值数组
      */
     private void saveSensorDataToExcel(String timestamp, long millis, double[] values) {
-        // 只要Excel已初始化且有数据，就保存（不再检查实时保存开关）
         if (excelExporter.getRowCount() == 0) {
             return;
         }
         
-        Object[] rowData = new Object[18];
+        Object[] rowData = new Object[22];
         rowData[0] = timestamp;
         rowData[1] = millis;
         
-        for (int i = 0; i < Math.min(values.length, 16); i++) {
+        for (int i = 0; i < Math.min(values.length, 20); i++) {
             rowData[i + 2] = values[i];
         }
         
@@ -513,7 +533,7 @@ public class SerialGuiApp extends JFrame {
             realTimeSaveCheckBox.setSelected(false);
             
             System.out.println("✓ 新会话已开始，Excel导出器已初始化");
-            System.out.println("💡 提示：所有传感器数据将自动记录，点击'导出当前数据到Excel'即可导出");
+            System.out.println("提示：所有传感器数据将自动记录，点击'导出当前数据到Excel'即可导出");
         }
     }
 
@@ -608,7 +628,7 @@ public class SerialGuiApp extends JFrame {
                 String timeStamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
                 long millis = System.currentTimeMillis();
                 
-                double[] values = new double[16];
+                double[] values = new double[20];
                 values[0] = sensorValues.getOrDefault("ts_voltage", 0.0);
                 values[1] = sensorValues.getOrDefault("ts_current", 0.0);
                 values[2] = sensorValues.getOrDefault("brake_pressure", 0.0);
@@ -625,6 +645,10 @@ public class SerialGuiApp extends JFrame {
                 values[13] = sensorValues.getOrDefault("motor_ctrl_temp", 0.0);
                 values[14] = sensorValues.getOrDefault("front_wheel_speed", 0.0);
                 values[15] = sensorValues.getOrDefault("power_consumption", 0.0);
+                values[16] = sensorValues.getOrDefault("steering_angle", 0.0);
+                values[17] = sensorValues.getOrDefault("suspension_fl", 0.0);
+                values[18] = sensorValues.getOrDefault("suspension_fr", 0.0);
+                values[19] = sensorValues.getOrDefault("coolant_temp", 0.0);
                 
                 saveSensorDataToExcel(timeStamp, millis, values);
             }
