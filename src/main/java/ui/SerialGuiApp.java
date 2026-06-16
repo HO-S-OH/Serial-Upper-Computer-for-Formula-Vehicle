@@ -4,8 +4,10 @@ import com.fazecast.jSerialComm.SerialPortDataListener;
 import com.fazecast.jSerialComm.SerialPortEvent;
 import sensor.BarSensorCard;
 import sensor.BidirectionalBarSensorCard;
+import sensor.DualSensorCard;
 import sensor.SensorDataCard;
 import sensor.SensorType;
+import sensor.TireTempSensorCard;
 import serial.ExcelExporter;
 import serial.SerialConfig;
 import serial.SerialHelper;
@@ -64,6 +66,12 @@ public class SerialGuiApp extends JFrame {
 
     // 传感器数据存储
     private Map<String, SensorDataCard> sensorCardsMap;
+    
+    // 胎温卡片存储
+    private Map<String, TireTempSensorCard> tireTempCardsMap;
+    
+    // 轮速卡片存储
+    private Map<String, DualSensorCard> wheelSpeedCardsMap;
 
     // 主分割面板
     private JSplitPane mainSplitPane;
@@ -82,6 +90,8 @@ public class SerialGuiApp extends JFrame {
         serialHelper = new SerialHelper();
         excelExporter = new ExcelExporter();
         sensorCardsMap = new HashMap<>();
+        tireTempCardsMap = new HashMap<>();
+        wheelSpeedCardsMap = new HashMap<>();
         initUI();
     }
 
@@ -303,11 +313,20 @@ public class SerialGuiApp extends JFrame {
         colorMap.put(SensorType.THROTTLE, new Color(25, 135, 84));
         colorMap.put(SensorType.SPEED, new Color(111, 66, 193));
         colorMap.put(SensorType.WATER_TEMP, new Color(23, 162, 184));
+        colorMap.put(SensorType.COOLANT_TEMP, new Color(0, 191, 255));
         
-        colorMap.put(SensorType.TIRE_TEMP_FL, new Color(255, 87, 34));
-        colorMap.put(SensorType.TIRE_TEMP_FR, new Color(255, 87, 34));
-        colorMap.put(SensorType.TIRE_TEMP_RL, new Color(255, 87, 34));
-        colorMap.put(SensorType.TIRE_TEMP_RR, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_FL_LEFT, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_FL_CENTER, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_FL_RIGHT, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_FR_LEFT, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_FR_CENTER, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_FR_RIGHT, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RL_LEFT, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RL_CENTER, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RL_RIGHT, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RR_LEFT, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RR_CENTER, new Color(255, 87, 34));
+        colorMap.put(SensorType.TIRE_TEMP_RR_RIGHT, new Color(255, 87, 34));
         
         colorMap.put(SensorType.MIN_CELL_VOLT, new Color(156, 39, 176));
         colorMap.put(SensorType.CELL_TEMP, new Color(233, 30, 99));
@@ -315,15 +334,42 @@ public class SerialGuiApp extends JFrame {
         colorMap.put(SensorType.MOTOR_TEMP, new Color(0, 150, 136));
         colorMap.put(SensorType.MOTOR_CTRL_TEMP, new Color(0, 188, 212));
         
-        colorMap.put(SensorType.FRONT_WHEEL_SPEED, new Color(63, 81, 181));
+        colorMap.put(SensorType.FRONT_WHEEL_SPEED_LEFT, new Color(63, 81, 181));
+        colorMap.put(SensorType.FRONT_WHEEL_SPEED_RIGHT, new Color(63, 81, 181));
         colorMap.put(SensorType.POWER_CONSUMPTION, new Color(76, 175, 80));
         
         colorMap.put(SensorType.STEERING_ANGLE, new Color(255, 140, 0));
         colorMap.put(SensorType.SUSPENSION_FL, new Color(186, 85, 211));
         colorMap.put(SensorType.SUSPENSION_FR, new Color(186, 85, 211));
-        colorMap.put(SensorType.COOLANT_TEMP, new Color(0, 191, 255));
         
+        // 创建4个胎温卡片（每个轮胎一个，含左/中/右三个探头）
+        TireTempSensorCard flCard = new TireTempSensorCard("左前轮", new Color(255, 87, 34));
+        sensorCardsPanel.add(flCard);
+        tireTempCardsMap.put("tire_temp_fl", flCard);
+        
+        TireTempSensorCard frCard = new TireTempSensorCard("右前轮", new Color(255, 87, 34));
+        sensorCardsPanel.add(frCard);
+        tireTempCardsMap.put("tire_temp_fr", frCard);
+        
+        TireTempSensorCard rlCard = new TireTempSensorCard("左后轮", new Color(232, 120, 50));
+        sensorCardsPanel.add(rlCard);
+        tireTempCardsMap.put("tire_temp_rl", rlCard);
+        
+        TireTempSensorCard rrCard = new TireTempSensorCard("右后轮", new Color(232, 120, 50));
+        sensorCardsPanel.add(rrCard);
+        tireTempCardsMap.put("tire_temp_rr", rrCard);
+        
+        // 创建前轮轮速卡片（左前/右前并排）
+        DualSensorCard wheelSpeedCard = new DualSensorCard("前轮轮速", "左前轮", "右前轮", "rpm", new Color(63, 81, 181));
+        sensorCardsPanel.add(wheelSpeedCard);
+        wheelSpeedCardsMap.put("front_wheel_speed", wheelSpeedCard);
+        
+        // 创建其他传感器卡片（跳过胎温和轮速类型，因为已单独处理）
         for (SensorType type : SensorType.values()) {
+            if ("胎温".equals(type.getDisplayType()) || "轮速".equals(type.getDisplayType())) {
+                continue;
+            }
+            
             Color color = colorMap.get(type);
             
             if (color == null) {
@@ -370,7 +416,7 @@ public class SerialGuiApp extends JFrame {
             }
         }
         
-        System.out.println("已创建 " + sensorCardsMap.size() + " 个传感器卡片");
+        System.out.println("已创建 " + (sensorCardsMap.size() + tireTempCardsMap.size() + wheelSpeedCardsMap.size()) + " 个传感器卡片");
     }
 
     /**
@@ -383,12 +429,12 @@ public class SerialGuiApp extends JFrame {
                 "时间戳", "毫秒时间", 
                 "TS电压(V)", "TS电流(A)", 
                 "刹车压力(bar)", "油门位置(%)", 
-                "车速(km/h)", "水温(°C)",
+                "车速(km/h)", "水箱温度1(°C)", "水箱温度2(°C)",
                 "左前胎温(°C)", "右前胎温(°C)", "左后胎温(°C)", "右后胎温(°C)",
                 "最低电芯电压(V)", "电芯温度(°C)",
                 "电机温度(°C)", "电机控制器温度(°C)",
-                "前轮轮速(rpm)", "用电量(Wh)",
-                "方向盘角度(°)", "左前悬架(mm)", "右前悬架(mm)", "水箱温度(°C)"
+                "左前轮速(rpm)", "右前轮速(rpm)", "用电量(Wh)",
+                "方向盘角度(°)", "左前悬架(mm)", "右前悬架(mm)"
             };
             
             excelExporter.createSheet("传感器数据", headers);
@@ -488,11 +534,11 @@ public class SerialGuiApp extends JFrame {
             return;
         }
         
-        Object[] rowData = new Object[22];
+        Object[] rowData = new Object[23];
         rowData[0] = timestamp;
         rowData[1] = millis;
         
-        for (int i = 0; i < Math.min(values.length, 20); i++) {
+        for (int i = 0; i < Math.min(values.length, 21); i++) {
             rowData[i + 2] = values[i];
         }
         
@@ -609,7 +655,13 @@ public class SerialGuiApp extends JFrame {
                             
                             SensorType type = SensorType.fromKey(sensorKey);
                             
-                            if (type != null) {
+                            if (type != null && "胎温".equals(type.getDisplayType())) {
+                                updateTireTempCard(sensorKey, value);
+                                sensorValues.put(sensorKey, value);
+                            } else if (type != null && "轮速".equals(type.getDisplayType())) {
+                                updateWheelSpeedCard(sensorKey, value);
+                                sensorValues.put(sensorKey, value);
+                            } else if (type != null) {
                                 if (sensorCardsMap.containsKey(sensorKey)) {
                                     sensorCardsMap.get(sensorKey).updateValue(value);
                                     sensorValues.put(sensorKey, value);
@@ -628,27 +680,28 @@ public class SerialGuiApp extends JFrame {
                 String timeStamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
                 long millis = System.currentTimeMillis();
                 
-                double[] values = new double[20];
+                double[] values = new double[21];
                 values[0] = sensorValues.getOrDefault("ts_voltage", 0.0);
                 values[1] = sensorValues.getOrDefault("ts_current", 0.0);
                 values[2] = sensorValues.getOrDefault("brake_pressure", 0.0);
                 values[3] = sensorValues.getOrDefault("throttle", 0.0);
                 values[4] = sensorValues.getOrDefault("speed", 0.0);
                 values[5] = sensorValues.getOrDefault("water_temp", 0.0);
-                values[6] = sensorValues.getOrDefault("tire_temp_fl", 0.0);
-                values[7] = sensorValues.getOrDefault("tire_temp_fr", 0.0);
-                values[8] = sensorValues.getOrDefault("tire_temp_rl", 0.0);
-                values[9] = sensorValues.getOrDefault("tire_temp_rr", 0.0);
-                values[10] = sensorValues.getOrDefault("min_cell_volt", 0.0);
-                values[11] = sensorValues.getOrDefault("cell_temp", 0.0);
-                values[12] = sensorValues.getOrDefault("motor_temp", 0.0);
-                values[13] = sensorValues.getOrDefault("motor_ctrl_temp", 0.0);
-                values[14] = sensorValues.getOrDefault("front_wheel_speed", 0.0);
-                values[15] = sensorValues.getOrDefault("power_consumption", 0.0);
-                values[16] = sensorValues.getOrDefault("steering_angle", 0.0);
-                values[17] = sensorValues.getOrDefault("suspension_fl", 0.0);
-                values[18] = sensorValues.getOrDefault("suspension_fr", 0.0);
-                values[19] = sensorValues.getOrDefault("coolant_temp", 0.0);
+                values[6] = sensorValues.getOrDefault("coolant_temp", 0.0);
+                values[7] = sensorValues.getOrDefault("tire_temp_fl_center", 0.0);
+                values[8] = sensorValues.getOrDefault("tire_temp_fr_center", 0.0);
+                values[9] = sensorValues.getOrDefault("tire_temp_rl_center", 0.0);
+                values[10] = sensorValues.getOrDefault("tire_temp_rr_center", 0.0);
+                values[11] = sensorValues.getOrDefault("min_cell_volt", 0.0);
+                values[12] = sensorValues.getOrDefault("cell_temp", 0.0);
+                values[13] = sensorValues.getOrDefault("motor_temp", 0.0);
+                values[14] = sensorValues.getOrDefault("motor_ctrl_temp", 0.0);
+                values[15] = sensorValues.getOrDefault("front_wheel_speed_left", 0.0);
+                values[16] = sensorValues.getOrDefault("front_wheel_speed_right", 0.0);
+                values[17] = sensorValues.getOrDefault("power_consumption", 0.0);
+                values[18] = sensorValues.getOrDefault("steering_angle", 0.0);
+                values[19] = sensorValues.getOrDefault("suspension_fl", 0.0);
+                values[20] = sensorValues.getOrDefault("suspension_fr", 0.0);
                 
                 saveSensorDataToExcel(timeStamp, millis, values);
             }
@@ -656,6 +709,65 @@ public class SerialGuiApp extends JFrame {
         } catch (Exception e) {
             System.err.println("数据解析错误: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+    
+    /**
+     * 更新胎温卡片数据
+     * 根据键名判断属于哪个轮胎的哪个探头位置
+     * @param sensorKey 传感器键名
+     * @param value 温度值
+     */
+    private void updateTireTempCard(String sensorKey, double value) {
+        String tirePrefix;
+        String position;
+        
+        if (sensorKey.startsWith("tire_temp_fl_")) {
+            tirePrefix = "tire_temp_fl";
+            position = sensorKey.substring("tire_temp_fl_".length());
+        } else if (sensorKey.startsWith("tire_temp_fr_")) {
+            tirePrefix = "tire_temp_fr";
+            position = sensorKey.substring("tire_temp_fr_".length());
+        } else if (sensorKey.startsWith("tire_temp_rl_")) {
+            tirePrefix = "tire_temp_rl";
+            position = sensorKey.substring("tire_temp_rl_".length());
+        } else if (sensorKey.startsWith("tire_temp_rr_")) {
+            tirePrefix = "tire_temp_rr";
+            position = sensorKey.substring("tire_temp_rr_".length());
+        } else {
+            return;
+        }
+        
+        TireTempSensorCard card = tireTempCardsMap.get(tirePrefix);
+        if (card == null) return;
+        
+        switch (position) {
+            case "left":
+                card.updateLeftTemp(value);
+                break;
+            case "center":
+                card.updateCenterTemp(value);
+                break;
+            case "right":
+                card.updateRightTemp(value);
+                break;
+        }
+    }
+    
+    /**
+     * 更新轮速卡片数据
+     * 根据键名判断属于左前还是右前轮速
+     * @param sensorKey 传感器键名
+     * @param value 轮速值
+     */
+    private void updateWheelSpeedCard(String sensorKey, double value) {
+        DualSensorCard card = wheelSpeedCardsMap.get("front_wheel_speed");
+        if (card == null) return;
+        
+        if ("front_wheel_speed_left".equals(sensorKey)) {
+            card.updateLeftValue(value);
+        } else if ("front_wheel_speed_right".equals(sensorKey)) {
+            card.updateRightValue(value);
         }
     }
 
