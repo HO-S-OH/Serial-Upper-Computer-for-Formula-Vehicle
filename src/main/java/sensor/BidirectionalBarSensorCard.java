@@ -12,7 +12,6 @@ public class BidirectionalBarSensorCard extends SensorDataCard {
     private JProgressBar progressBar;
     private double minValue;
     private double maxValue;
-    private double zeroPoint;
     
     /**
      * 构造函数
@@ -26,7 +25,6 @@ public class BidirectionalBarSensorCard extends SensorDataCard {
         super(name, unit, themeColor);
         this.minValue = min;
         this.maxValue = max;
-        this.zeroPoint = 0;
         
         initBidirectionalProgressBar();
     }
@@ -35,7 +33,6 @@ public class BidirectionalBarSensorCard extends SensorDataCard {
      * 初始化双向进度条
      */
     private void initBidirectionalProgressBar() {
-        int range = (int)(maxValue - minValue);
         progressBar = new JProgressBar((int)minValue, (int)maxValue);
         progressBar.setStringPainted(true);
         progressBar.setFont(new Font("微软雅黑", Font.BOLD, 11));

@@ -10,15 +10,12 @@ import java.util.List;
  * 用于展示单个传感器的实时数据，包括数值、单位和统计信息
  */
 public class SensorDataCard extends JPanel {
-    private JLabel nameLabel;        // 传感器名称标签
     private JLabel valueLabel;       // 数值显示标签
-    private JLabel unitLabel;        // 单位显示标签
     private JLabel historyLabel;     // 历史统计信息标签
     
-    private String sensorName;       // 传感器名称
-    private String unit;             // 单位
+    private final String unit;             // 单位
     protected Color themeColor;      // 主题颜色（改为protected，让子类可以访问）
-    private List<Double> recentValues; // 最近的数据值列表
+    private final List<Double> recentValues; // 最近的数据值列表
     
     /**
      * 构造函数
@@ -27,18 +24,17 @@ public class SensorDataCard extends JPanel {
      * @param themeColor 主题颜色
      */
     public SensorDataCard(String name, String unit, Color themeColor) {
-        this.sensorName = name;
         this.unit = unit;
         this.themeColor = themeColor;
         this.recentValues = new ArrayList<>();
         
-        initUI();
+        initUI(name);
     }
     
     /**
      * 初始化UI组件
      */
-    private void initUI() {
+    private void initUI(String name) {
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(themeColor, 3),
@@ -48,7 +44,7 @@ public class SensorDataCard extends JPanel {
         setPreferredSize(new Dimension(300, 180));
         
         // 传感器名称
-        nameLabel = new JLabel(sensorName);
+        JLabel nameLabel = new JLabel(name);
         nameLabel.setFont(new Font("微软雅黑", Font.BOLD, 16));
         nameLabel.setForeground(themeColor.darker());
         add(nameLabel, BorderLayout.NORTH);
@@ -63,7 +59,7 @@ public class SensorDataCard extends JPanel {
         valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
         centerPanel.add(valueLabel, BorderLayout.CENTER);
         
-        unitLabel = new JLabel(unit);
+        JLabel unitLabel = new JLabel(unit);
         unitLabel.setFont(new Font("微软雅黑", Font.BOLD, 15));
         unitLabel.setForeground(Color.GRAY);
         unitLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -88,7 +84,7 @@ public class SensorDataCard extends JPanel {
         // 记录历史数据（保留最近10个值）
         recentValues.add(value);
         if (recentValues.size() > 10) {
-            recentValues.remove(0);
+            recentValues.removeFirst();
         }
         
         // 更新统计信息
@@ -98,7 +94,7 @@ public class SensorDataCard extends JPanel {
     /**
      * 更新历史统计信息
      */
-    private void updateStatistics() {
+    protected void updateStatistics() {
         if (recentValues.isEmpty()) return;
         
         double min = recentValues.stream().mapToDouble(Double::doubleValue).min().orElse(0);
@@ -106,13 +102,5 @@ public class SensorDataCard extends JPanel {
         double avg = recentValues.stream().mapToDouble(Double::doubleValue).average().orElse(0);
         
         historyLabel.setText(String.format("最小:%.1f | 最大:%.1f | 平均:%.1f", min, max, avg));
-    }
-    
-    /**
-     * 获取主题颜色
-     * @return 主题颜色
-     */
-    public Color getThemeColor() {
-        return themeColor;
     }
 }

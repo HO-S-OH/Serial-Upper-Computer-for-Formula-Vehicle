@@ -18,7 +18,6 @@ public class DualSensorCard extends JPanel {
     private JLabel rightStatusLabel;
     private JLabel historyLabel;
 
-    private String sensorName;
     private String unit;
     private Color themeColor;
 
@@ -34,19 +33,18 @@ public class DualSensorCard extends JPanel {
      * @param themeColor 主题颜色
      */
     public DualSensorCard(String name, String leftLabel, String rightLabel, String unit, Color themeColor) {
-        this.sensorName = name;
         this.unit = unit;
         this.themeColor = themeColor;
         this.recentLeftValues = new ArrayList<>();
         this.recentRightValues = new ArrayList<>();
 
-        initUI(leftLabel, rightLabel);
+        initUI(name, leftLabel, rightLabel);
     }
 
     /**
      * 初始化UI组件
      */
-    private void initUI(String leftLabel, String rightLabel) {
+    private void initUI(String name, String leftLabel, String rightLabel) {
         setLayout(new BorderLayout(8, 8));
         setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(themeColor, 3),
@@ -55,7 +53,7 @@ public class DualSensorCard extends JPanel {
         setBackground(Color.WHITE);
         setPreferredSize(new Dimension(300, 200));
 
-        nameLabel = new JLabel(sensorName);
+        nameLabel = new JLabel(name);
         nameLabel.setFont(new Font("微软雅黑", Font.BOLD, 15));
         nameLabel.setForeground(themeColor.darker());
         add(nameLabel, BorderLayout.NORTH);

@@ -40,7 +40,43 @@ public enum SensorType {
     
     STEERING_ANGLE("steering_angle", "方向盘角度", "°", "双向进度条"),
     SUSPENSION_FL("suspension_fl", "左前悬架位移", "mm", "双向进度条"),
-    SUSPENSION_FR("suspension_fr", "右前悬架位移", "mm", "双向进度条");
+    SUSPENSION_FR("suspension_fr", "右前悬架位移", "mm", "双向进度条"),
+    
+    SUSPENSION_LOAD_FL_1("suspension_load_fl_1", "左前悬架-上叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_FL_2("suspension_load_fl_2", "左前悬架-上叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_FL_3("suspension_load_fl_3", "左前悬架-下叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_FL_4("suspension_load_fl_4", "左前悬架-下叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_FL_5("suspension_load_fl_5", "左前悬架-推杆", "N", "悬架受力"),
+    
+    SUSPENSION_LOAD_FR_1("suspension_load_fr_1", "右前悬架-上叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_FR_2("suspension_load_fr_2", "右前悬架-上叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_FR_3("suspension_load_fr_3", "右前悬架-下叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_FR_4("suspension_load_fr_4", "右前悬架-下叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_FR_5("suspension_load_fr_5", "右前悬架-推杆", "N", "悬架受力"),
+    
+    SUSPENSION_LOAD_RL_1("suspension_load_rl_1", "左后悬架-上叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_RL_2("suspension_load_rl_2", "左后悬架-上叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_RL_3("suspension_load_rl_3", "左后悬架-下叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_RL_4("suspension_load_rl_4", "左后悬架-下叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_RL_5("suspension_load_rl_5", "左后悬架-推杆", "N", "悬架受力"),
+    
+    SUSPENSION_LOAD_RR_1("suspension_load_rr_1", "右后悬架-上叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_RR_2("suspension_load_rr_2", "右后悬架-上叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_RR_3("suspension_load_rr_3", "右后悬架-下叉臂1", "N", "悬架受力"),
+    SUSPENSION_LOAD_RR_4("suspension_load_rr_4", "右后悬架-下叉臂2", "N", "悬架受力"),
+    SUSPENSION_LOAD_RR_5("suspension_load_rr_5", "右后悬架-推杆", "N", "悬架受力"),
+    
+    ACCEL_X("accel_x", "加速度-X", "m/s²", "三轴"),
+    ACCEL_Y("accel_y", "加速度-Y", "m/s²", "三轴"),
+    ACCEL_Z("accel_z", "加速度-Z", "m/s²", "三轴"),
+    
+    GYRO_X("gyro_x", "陀螺仪-X", "°/s", "三轴"),
+    GYRO_Y("gyro_y", "陀螺仪-Y", "°/s", "三轴"),
+    GYRO_Z("gyro_z", "陀螺仪-Z", "°/s", "三轴"),
+    
+    MAG_X("mag_x", "磁力计-X", "μT", "三轴"),
+    MAG_Y("mag_y", "磁力计-Y", "μT", "三轴"),
+    MAG_Z("mag_z", "磁力计-Z", "μT", "三轴");
 
     private String key;
     private String displayName;

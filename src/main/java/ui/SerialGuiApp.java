@@ -7,7 +7,9 @@ import sensor.BidirectionalBarSensorCard;
 import sensor.DualSensorCard;
 import sensor.SensorDataCard;
 import sensor.SensorType;
+import sensor.SuspensionLoadCard;
 import sensor.TireTempSensorCard;
+import sensor.TriAxisSensorCard;
 import serial.ExcelExporter;
 import serial.SerialConfig;
 import serial.SerialHelper;
@@ -15,12 +17,9 @@ import serial.SerialHelper;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import java.awt.*;
-import java.io.File;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,9 +33,6 @@ public class SerialGuiApp extends JFrame {
     
     // Excel导出器
     private ExcelExporter excelExporter;
-    
-    // 是否启用实时保存
-    private boolean isRealTimeSaveEnabled = false;
 
     // ========== 界面组件声明 ==========
 
@@ -72,11 +68,11 @@ public class SerialGuiApp extends JFrame {
     
     // 轮速卡片存储
     private Map<String, DualSensorCard> wheelSpeedCardsMap;
+    
+    private Map<String, SuspensionLoadCard> suspensionLoadCardsMap;
+    
+    private Map<String, TriAxisSensorCard> triAxisCardsMap;
 
-    // 主分割面板
-    private JSplitPane mainSplitPane;
-
-    // 工具栏按钮
     private JButton connectButton;
 
     // 连接状态标识
@@ -92,6 +88,8 @@ public class SerialGuiApp extends JFrame {
         sensorCardsMap = new HashMap<>();
         tireTempCardsMap = new HashMap<>();
         wheelSpeedCardsMap = new HashMap<>();
+        suspensionLoadCardsMap = new HashMap<>();
+        triAxisCardsMap = new HashMap<>();
         initUI();
     }
 
@@ -145,7 +143,7 @@ public class SerialGuiApp extends JFrame {
         mainPanel.add(toolbar, BorderLayout.NORTH);
 
         // 中间内容区域（传感器卡片 + 原始数据）
-        mainSplitPane = createContentPanel();
+        JSplitPane mainSplitPane = createContentPanel();
         mainPanel.add(mainSplitPane, BorderLayout.CENTER);
 
         // 底部状态栏
@@ -193,8 +191,7 @@ public class SerialGuiApp extends JFrame {
         realTimeSaveCheckBox.setForeground(Color.WHITE);
         realTimeSaveCheckBox.setOpaque(false);
         realTimeSaveCheckBox.addActionListener(e -> {
-            isRealTimeSaveEnabled = realTimeSaveCheckBox.isSelected();
-            if (isRealTimeSaveEnabled) {
+            if (realTimeSaveCheckBox.isSelected()) {
                 System.out.println("✓ 实时保存已启用（数据将自动记录到Excel）");
             } else {
                 System.out.println("○ 实时保存已禁用（数据仍会记录，可手动导出）");
@@ -342,7 +339,10 @@ public class SerialGuiApp extends JFrame {
         colorMap.put(SensorType.SUSPENSION_FL, new Color(186, 85, 211));
         colorMap.put(SensorType.SUSPENSION_FR, new Color(186, 85, 211));
         
-        // 创建4个胎温卡片（每个轮胎一个，含左/中/右三个探头）
+        colorMap.put(SensorType.ACCEL_X, new Color(255, 87, 34));
+        colorMap.put(SensorType.GYRO_X, new Color(33, 150, 243));
+        colorMap.put(SensorType.MAG_X, new Color(156, 39, 176));
+        
         TireTempSensorCard flCard = new TireTempSensorCard("左前轮", new Color(255, 87, 34));
         sensorCardsPanel.add(flCard);
         tireTempCardsMap.put("tire_temp_fl", flCard);
@@ -364,9 +364,38 @@ public class SerialGuiApp extends JFrame {
         sensorCardsPanel.add(wheelSpeedCard);
         wheelSpeedCardsMap.put("front_wheel_speed", wheelSpeedCard);
         
-        // 创建其他传感器卡片（跳过胎温和轮速类型，因为已单独处理）
+        // 创建4个悬架受力卡片（每个悬架5个探头）
+        SuspensionLoadCard slFlCard = new SuspensionLoadCard("左前悬架", new Color(100, 149, 237));
+        sensorCardsPanel.add(slFlCard);
+        suspensionLoadCardsMap.put("suspension_load_fl", slFlCard);
+        
+        SuspensionLoadCard slFrCard = new SuspensionLoadCard("右前悬架", new Color(100, 149, 237));
+        sensorCardsPanel.add(slFrCard);
+        suspensionLoadCardsMap.put("suspension_load_fr", slFrCard);
+        
+        SuspensionLoadCard slRlCard = new SuspensionLoadCard("左后悬架", new Color(72, 118, 255));
+        sensorCardsPanel.add(slRlCard);
+        suspensionLoadCardsMap.put("suspension_load_rl", slRlCard);
+        
+        SuspensionLoadCard slRrCard = new SuspensionLoadCard("右后悬架", new Color(72, 118, 255));
+        sensorCardsPanel.add(slRrCard);
+        suspensionLoadCardsMap.put("suspension_load_rr", slRrCard);
+        
+        TriAxisSensorCard accelCard = new TriAxisSensorCard("加速度计", "m/s²", new Color(255, 87, 34));
+        sensorCardsPanel.add(accelCard);
+        triAxisCardsMap.put("accel", accelCard);
+        
+        TriAxisSensorCard gyroCard = new TriAxisSensorCard("陀螺仪", "°/s", new Color(33, 150, 243));
+        sensorCardsPanel.add(gyroCard);
+        triAxisCardsMap.put("gyro", gyroCard);
+        
+        TriAxisSensorCard magCard = new TriAxisSensorCard("磁力计", "μT", new Color(156, 39, 176));
+        sensorCardsPanel.add(magCard);
+        triAxisCardsMap.put("mag", magCard);
+        
         for (SensorType type : SensorType.values()) {
-            if ("胎温".equals(type.getDisplayType()) || "轮速".equals(type.getDisplayType())) {
+            if ("胎温".equals(type.getDisplayType()) || "轮速".equals(type.getDisplayType()) || 
+                "悬架受力".equals(type.getDisplayType()) || "三轴".equals(type.getDisplayType())) {
                 continue;
             }
             
@@ -416,7 +445,9 @@ public class SerialGuiApp extends JFrame {
             }
         }
         
-        System.out.println("已创建 " + (sensorCardsMap.size() + tireTempCardsMap.size() + wheelSpeedCardsMap.size()) + " 个传感器卡片");
+        System.out.println("已创建 " + (sensorCardsMap.size() + tireTempCardsMap.size() + 
+                          wheelSpeedCardsMap.size() + suspensionLoadCardsMap.size() + 
+                          triAxisCardsMap.size()) + " 个传感器卡片");
     }
 
     /**
@@ -434,7 +465,14 @@ public class SerialGuiApp extends JFrame {
                 "最低电芯电压(V)", "电芯温度(°C)",
                 "电机温度(°C)", "电机控制器温度(°C)",
                 "左前轮速(rpm)", "右前轮速(rpm)", "用电量(Wh)",
-                "方向盘角度(°)", "左前悬架(mm)", "右前悬架(mm)"
+                "方向盘角度(°)", "左前悬架(mm)", "右前悬架(mm)",
+                "左前-上叉臂1(N)", "左前-上叉臂2(N)", "左前-下叉臂1(N)", "左前-下叉臂2(N)", "左前-推杆(N)",
+                "右前-上叉臂1(N)", "右前-上叉臂2(N)", "右前-下叉臂1(N)", "右前-下叉臂2(N)", "右前-推杆(N)",
+                "左后-上叉臂1(N)", "左后-上叉臂2(N)", "左后-下叉臂1(N)", "左后-下叉臂2(N)", "左后-推杆(N)",
+                "右后-上叉臂1(N)", "右后-上叉臂2(N)", "右后-下叉臂1(N)", "右后-下叉臂2(N)", "右后-推杆(N)",
+                "加速度-X(m/s²)", "加速度-Y(m/s²)", "加速度-Z(m/s²)",
+                "陀螺仪-X(°/s)", "陀螺仪-Y(°/s)", "陀螺仪-Z(°/s)",
+                "磁力计-X(μT)", "磁力计-Y(μT)", "磁力计-Z(μT)"
             };
             
             excelExporter.createSheet("传感器数据", headers);
@@ -534,11 +572,11 @@ public class SerialGuiApp extends JFrame {
             return;
         }
         
-        Object[] rowData = new Object[23];
+        Object[] rowData = new Object[52];
         rowData[0] = timestamp;
         rowData[1] = millis;
         
-        for (int i = 0; i < Math.min(values.length, 21); i++) {
+        for (int i = 0; i < Math.min(values.length, 50); i++) {
             rowData[i + 2] = values[i];
         }
         
@@ -575,7 +613,6 @@ public class SerialGuiApp extends JFrame {
             excelExporter.reset();
             initializeExcelExport();
             
-            isRealTimeSaveEnabled = false;
             realTimeSaveCheckBox.setSelected(false);
             
             System.out.println("✓ 新会话已开始，Excel导出器已初始化");
@@ -635,7 +672,6 @@ public class SerialGuiApp extends JFrame {
 
             String[] pairs = cleanedData.split(",");
             
-            // 用于存储解析出的传感器数据
             Map<String, Double> sensorValues = new HashMap<>();
 
             for (String pair : pairs) {
@@ -661,6 +697,12 @@ public class SerialGuiApp extends JFrame {
                             } else if (type != null && "轮速".equals(type.getDisplayType())) {
                                 updateWheelSpeedCard(sensorKey, value);
                                 sensorValues.put(sensorKey, value);
+                            } else if (type != null && "悬架受力".equals(type.getDisplayType())) {
+                                updateSuspensionLoadCard(sensorKey, value);
+                                sensorValues.put(sensorKey, value);
+                            } else if (type != null && "三轴".equals(type.getDisplayType())) {
+                                updateTriAxisCard(sensorKey, value);
+                                sensorValues.put(sensorKey, value);
                             } else if (type != null) {
                                 if (sensorCardsMap.containsKey(sensorKey)) {
                                     sensorCardsMap.get(sensorKey).updateValue(value);
@@ -675,12 +717,11 @@ public class SerialGuiApp extends JFrame {
                 }
             }
             
-            // 如果有传感器数据，自动保存到Excel（无论是否勾选实时保存）
             if (!sensorValues.isEmpty() && excelExporter.getRowCount() > 0) {
                 String timeStamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
                 long millis = System.currentTimeMillis();
                 
-                double[] values = new double[21];
+                double[] values = new double[50];
                 values[0] = sensorValues.getOrDefault("ts_voltage", 0.0);
                 values[1] = sensorValues.getOrDefault("ts_current", 0.0);
                 values[2] = sensorValues.getOrDefault("brake_pressure", 0.0);
@@ -702,6 +743,35 @@ public class SerialGuiApp extends JFrame {
                 values[18] = sensorValues.getOrDefault("steering_angle", 0.0);
                 values[19] = sensorValues.getOrDefault("suspension_fl", 0.0);
                 values[20] = sensorValues.getOrDefault("suspension_fr", 0.0);
+                values[21] = sensorValues.getOrDefault("suspension_load_fl_1", 0.0);
+                values[22] = sensorValues.getOrDefault("suspension_load_fl_2", 0.0);
+                values[23] = sensorValues.getOrDefault("suspension_load_fl_3", 0.0);
+                values[24] = sensorValues.getOrDefault("suspension_load_fl_4", 0.0);
+                values[25] = sensorValues.getOrDefault("suspension_load_fl_5", 0.0);
+                values[26] = sensorValues.getOrDefault("suspension_load_fr_1", 0.0);
+                values[27] = sensorValues.getOrDefault("suspension_load_fr_2", 0.0);
+                values[28] = sensorValues.getOrDefault("suspension_load_fr_3", 0.0);
+                values[29] = sensorValues.getOrDefault("suspension_load_fr_4", 0.0);
+                values[30] = sensorValues.getOrDefault("suspension_load_fr_5", 0.0);
+                values[31] = sensorValues.getOrDefault("suspension_load_rl_1", 0.0);
+                values[32] = sensorValues.getOrDefault("suspension_load_rl_2", 0.0);
+                values[33] = sensorValues.getOrDefault("suspension_load_rl_3", 0.0);
+                values[34] = sensorValues.getOrDefault("suspension_load_rl_4", 0.0);
+                values[35] = sensorValues.getOrDefault("suspension_load_rl_5", 0.0);
+                values[36] = sensorValues.getOrDefault("suspension_load_rr_1", 0.0);
+                values[37] = sensorValues.getOrDefault("suspension_load_rr_2", 0.0);
+                values[38] = sensorValues.getOrDefault("suspension_load_rr_3", 0.0);
+                values[39] = sensorValues.getOrDefault("suspension_load_rr_4", 0.0);
+                values[40] = sensorValues.getOrDefault("suspension_load_rr_5", 0.0);
+                values[41] = sensorValues.getOrDefault("accel_x", 0.0);
+                values[42] = sensorValues.getOrDefault("accel_y", 0.0);
+                values[43] = sensorValues.getOrDefault("accel_z", 0.0);
+                values[44] = sensorValues.getOrDefault("gyro_x", 0.0);
+                values[45] = sensorValues.getOrDefault("gyro_y", 0.0);
+                values[46] = sensorValues.getOrDefault("gyro_z", 0.0);
+                values[47] = sensorValues.getOrDefault("mag_x", 0.0);
+                values[48] = sensorValues.getOrDefault("mag_y", 0.0);
+                values[49] = sensorValues.getOrDefault("mag_z", 0.0);
                 
                 saveSensorDataToExcel(timeStamp, millis, values);
             }
@@ -770,7 +840,77 @@ public class SerialGuiApp extends JFrame {
             card.updateRightValue(value);
         }
     }
-
+    
+    /**
+     * 更新悬架受力卡片数据
+     * 根据键名判断属于哪个悬架的哪个探头
+     * @param sensorKey 传感器键名
+     * @param value 受力值
+     */
+    private void updateSuspensionLoadCard(String sensorKey, double value) {
+        String prefix;
+        String indexStr;
+        
+        if (sensorKey.startsWith("suspension_load_fl_")) {
+            prefix = "suspension_load_fl";
+            indexStr = sensorKey.substring("suspension_load_fl_".length());
+        } else if (sensorKey.startsWith("suspension_load_fr_")) {
+            prefix = "suspension_load_fr";
+            indexStr = sensorKey.substring("suspension_load_fr_".length());
+        } else if (sensorKey.startsWith("suspension_load_rl_")) {
+            prefix = "suspension_load_rl";
+            indexStr = sensorKey.substring("suspension_load_rl_".length());
+        } else if (sensorKey.startsWith("suspension_load_rr_")) {
+            prefix = "suspension_load_rr";
+            indexStr = sensorKey.substring("suspension_load_rr_".length());
+        } else {
+            return;
+        }
+        
+        SuspensionLoadCard card = suspensionLoadCardsMap.get(prefix);
+        if (card == null) return;
+        
+        try {
+            int index = Integer.parseInt(indexStr) - 1;
+            card.updateLoad(index, value);
+        } catch (NumberFormatException e) {
+            System.out.println("悬架受力索引错误: " + indexStr);
+        }
+    }
+    
+    private void updateTriAxisCard(String sensorKey, double value) {
+        String prefix;
+        String axis;
+        
+        if (sensorKey.startsWith("accel_")) {
+            prefix = "accel";
+            axis = sensorKey.substring("accel_".length());
+        } else if (sensorKey.startsWith("gyro_")) {
+            prefix = "gyro";
+            axis = sensorKey.substring("gyro_".length());
+        } else if (sensorKey.startsWith("mag_")) {
+            prefix = "mag";
+            axis = sensorKey.substring("mag_".length());
+        } else {
+            return;
+        }
+        
+        TriAxisSensorCard card = triAxisCardsMap.get(prefix);
+        if (card == null) return;
+        
+        switch (axis) {
+            case "x":
+                card.updateXValue(value);
+                break;
+            case "y":
+                card.updateYValue(value);
+                break;
+            case "z":
+                card.updateZValue(value);
+                break;
+        }
+    }
+    
     /**
      * 断开串口连接
      */
@@ -801,7 +941,6 @@ public class SerialGuiApp extends JFrame {
             }
         }
         
-        isRealTimeSaveEnabled = false;
         realTimeSaveCheckBox.setSelected(false);
         excelExporter.reset();
     }
